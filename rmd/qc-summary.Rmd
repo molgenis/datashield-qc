@@ -1,0 +1,57 @@
+---
+title: "qc-report"
+output: html_document
+date: "2024-05-09"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(kableExtra)
+library(dsBaseClient)
+library(purrr)
+library(tidyr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-stuff}
+source("../r/functions.R")
+source("../r/dictionary.R")
+path_to_dictionaries <- "/Users/tcadman/Library/Mobile Documents/com~apple~CloudDocs/work/repos/ds-dictionaries/dictionaries"
+```
+
+```{r login-assign, message = F, warning = F}
+source("../r/login.R")
+source("../r/assign.R")
+```
+
+### Which cohorts have which tables available
+```{r}
+dicts_available_sum <- .summarise_available_dics(path_to_dictionaries)
+```
+
+```{r cars, echo = F}
+dicts_available_sum %>% 
+  bind_rows(.id = "cohort") %>%
+  mutate(available = ifelse(is.na(available), "No", "Yes")) %>%
+  dplyr::select(cohort, type, name, available) %>%
+  pivot_wider(
+    names_from = cohort, 
+    values_from = available) %>%
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  collapse_rows(columns = 1, valign = "top")
+```
+
+### Cohort demographics
+
+
+What else?
+
+- Basic demographics (age of mothers, age of children, sex, ethnicity, education)
+- Total number of variables with some data
+- Within a domain, the number of variables for which there is some data
+- Maximum sample size
+
+
