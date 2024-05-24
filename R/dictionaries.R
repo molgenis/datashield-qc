@@ -12,7 +12,7 @@
 #' @importFrom DSI datashield.tables
 #' @return A final table containing cleaned and organized cohort dictionary information.
 #' @export
-identify_cohort_dics <- function(path_to_dic, conns){
+identify_cohort_dics <- function(path_to_dic, conns) {
   dictionaries <- list_all_dic_files(path_to_dic)
   dictionaries$ref <- paste0("id_", 1:nrow(dictionaries))
   elements <- .get_essential_dic_elements(dictionaries$name)
@@ -35,7 +35,7 @@ identify_cohort_dics <- function(path_to_dic, conns){
 #'
 #' @return A data frame with all available dictionary files and their formatted names.
 #' @export
-list_all_dic_files <- function(path_to_dictionaries){
+list_all_dic_files <- function(path_to_dictionaries) {
   types <- .list_dictionary_types(path_to_dictionaries)
   latest <- types %>% map_chr(.list_latest_version)
   files <- latest %>% map(.list_available_dics)
@@ -52,8 +52,8 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param path_to_dictionaries The path to the directory containing dictionaries.
 #'
 #' @return A character vector of paths to dictionary types.
-#' @export
-.list_dictionary_types <- function(path_to_dictionaries){
+#' @noRd
+.list_dictionary_types <- function(path_to_dictionaries) {
   list.dirs(path_to_dictionaries, recursive = FALSE)
 }
 
@@ -64,8 +64,8 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param dict_types A character vector of paths to dictionary types.
 #'
 #' @return A character string of the path to the latest version of the dictionary.
-#' @export
-.list_latest_version <- function(dict_types){
+#' @noRd
+.list_latest_version <- function(dict_types) {
   all_versions <- list.dirs(dict_types, recursive = FALSE)
   latest_version <- sort(all_versions, decreasing = TRUE)[1]
   return(latest_version)
@@ -78,8 +78,8 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param latest_version The path to the latest version of the dictionary.
 #'
 #' @return A character vector of available dictionary files.
-#' @export
-.list_available_dics <- function(latest_version){
+#' @noRd
+.list_available_dics <- function(latest_version) {
   list.files(latest_version)
 }
 
@@ -92,7 +92,7 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @return A character string of the extracted neat name.
 #' @importFrom stringr str_extract
 #' @noRd
-.extract_name <- function(latest_version){
+.extract_name <- function(latest_version) {
   neat_name <- str_extract(latest_version, "(?<=ds-dictionaries/dictionaries/)(.*?)(?=/[^/]*$)")
   return(neat_name)
 }
@@ -108,8 +108,8 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @importFrom tibble as_tibble
 #' @importFrom dplyr mutate
 #' @importFrom stringr str_remove
-#' @export
-.format_dictionary_names <- function(files, neat_names){
+#' @noRd
+.format_dictionary_names <- function(files, neat_names) {
   value <- name <- type <- long_name <- cohort <- NULL
   out <- files %>%
     set_names(neat_names) %>%
@@ -119,7 +119,8 @@ list_all_dic_files <- function(path_to_dictionaries){
     dplyr::rename(name = value) %>%
     mutate(
       name = str_remove(name, "\\.xlsx$"),
-      long_name = str_remove(name, "\\b[_\\d]+")) %>%
+      long_name = str_remove(name, "\\b[_\\d]+")
+    ) %>%
     mutate(long_name = paste0(type, "_", long_name))
   return(out)
 }
@@ -130,7 +131,7 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param clean_ids Cleaned IDs.
 #' @return A data frame with IDs joined with the cohort table.
 #' @noRd
-.join_ids_with_cohort_table <- function(cohort_dics, clean_ids){
+.join_ids_with_cohort_table <- function(cohort_dics, clean_ids) {
   with_ids <- cohort_dics %>%
     mutate(ref = clean_ids)
   return(with_ids)
@@ -142,7 +143,7 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param dictionaries Data frame containing dictionary information.
 #' @return A data frame with labels joined with the cohort table.
 #' @noRd
-.join_labels_with_cohort_table <- function(coh_dics, dictionaries){
+.join_labels_with_cohort_table <- function(coh_dics, dictionaries) {
   with_labels <- left_join(coh_dics, dictionaries, by = "ref")
   return(with_labels)
 }
@@ -151,13 +152,13 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param cohort_table_with_ids Data frame containing cohort table with IDs.
 #' @return A final dictionary table.
 #' @noRd
-.make_final_dic_table <- function(cohort_table_with_ids){
+.make_final_dic_table <- function(cohort_table_with_ids) {
   ref <- desc <- value <- cohort <- NULL
   neat_table <- cohort_table_with_ids %>%
     group_by(cohort, ref) %>%
     arrange(desc(value)) %>%
-    group_split %>%
-    map(~slice(., 1)) %>%
+    group_split() %>%
+    map(~ slice(., 1)) %>%
     bind_rows()
 }
 
@@ -166,7 +167,7 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param dictionaries Vector containing dictionary names.
 #' @return A vector of essential dictionary elements.
 #' @noRd
-.get_essential_dic_elements <- function(dictionaries){
+.get_essential_dic_elements <- function(dictionaries) {
   stems <- str_remove_all(dictionaries, "^[\\d_]+")
   stems <- str_remove_all(stems, "_rep$")
   return(stems)
@@ -177,8 +178,8 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param essential_dic_elements Vector containing essential dictionary elements.
 #' @return A list of split essential dictionary elements.
 #' @noRd
-.split_essential_dic_elements <- function(essential_dic_elements){
-  stems_split <- essential_dic_elements %>% map(~str_split(.x, "_"))
+.split_essential_dic_elements <- function(essential_dic_elements) {
+  stems_split <- essential_dic_elements %>% map(~ str_split(.x, "_"))
   return(stems_split)
 }
 
@@ -188,9 +189,9 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param types Vector containing dictionary types.
 #' @return A list of split dictionary elements with types.
 #' @noRd
-.join_split_dic_elements_with_type <- function(split_dic_elements, types){
+.join_split_dic_elements_with_type <- function(split_dic_elements, types) {
   all_dic_parts <- list(split_dic_elements, types) %>%
-    pmap(function(.x, .y){
+    pmap(function(.x, .y) {
       out <- c(.x[[1]], .y)
       return(out)
     })
@@ -203,9 +204,9 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param id_refs Vector containing ID references.
 #' @return A vector of IDs for all elements.
 #' @noRd
-.get_ids_for_everything <- function(dic_vec, all_dic_parts, id_refs){
+.get_ids_for_everything <- function(dic_vec, all_dic_parts, id_refs) {
   dic_vec %>%
-    map(~.summarise_which_dic_matched(.x, all_dic_parts, id_refs))
+    map(~ .summarise_which_dic_matched(.x, all_dic_parts, id_refs))
 }
 
 #' Summarise Which Dictionary Matched
@@ -215,7 +216,7 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param id_refs Vector containing ID references.
 #' @return Names of the matched dictionary.
 #' @noRd
-.summarise_which_dic_matched <- function(single_coh_dic, all_dic_parts, id_refs){
+.summarise_which_dic_matched <- function(single_coh_dic, all_dic_parts, id_refs) {
   what_is_matched <- .find_if_any_dic_present(single_coh_dic, all_dic_parts)
   names_of_what_matched <- id_refs[what_is_matched]
   return(names_of_what_matched)
@@ -227,9 +228,9 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param all_dic_parts List containing all dictionary parts.
 #' @return Logical vector indicating whether any dictionary is present.
 #' @noRd
-.find_if_any_dic_present <- function(single_coh_dic, all_dic_parts){
+.find_if_any_dic_present <- function(single_coh_dic, all_dic_parts) {
   any_present <- all_dic_parts %>%
-    map_lgl(~.find_if_dic_present(single_coh_dic, .x))
+    map_lgl(~ .find_if_dic_present(single_coh_dic, .x))
   return(any_present)
 }
 
@@ -239,9 +240,9 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param single_dic_part Single dictionary part.
 #' @return Logical value indicating whether the dictionary is present.
 #' @noRd
-.find_if_dic_present <- function(single_coh_dic, single_dic_part){
+.find_if_dic_present <- function(single_coh_dic, single_dic_part) {
   present <- single_dic_part %>%
-    map(~str_detect(single_coh_dic, .x))
+    map(~ str_detect(single_coh_dic, .x))
   is_it_present <- all(unlist(present))
   return(is_it_present)
 }
@@ -251,7 +252,7 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param conns Database connections object.
 #' @return A tibble containing cohort dictionaries.
 #' @noRd
-.get_cohort_dics <- function(conns){
+.get_cohort_dics <- function(conns) {
   coh_tables <- datashield.tables(conns) %>%
     map(as_tibble) %>%
     bind_rows(.id = "cohort")
@@ -263,22 +264,22 @@ list_all_dic_files <- function(path_to_dictionaries){
 #' @param ids Vector containing IDs.
 #' @return Cleaned IDs.
 #' @noRd
-.clean_ids <- function(ids){
+.clean_ids <- function(ids) {
   ids_clean <- ids %>%
-    map(function(x){
-      if(identical(x, character(0))){
+    map(function(x) {
+      if (identical(x, character(0))) {
         x <- NA
       }
-      if(identical(x, c("id_11", "id_15"))){
+      if (identical(x, c("id_11", "id_15"))) {
         x <- "id_15"
       }
-      if(identical(x, c("id_12", "id_16"))){
+      if (identical(x, c("id_12", "id_16"))) {
         x <- "id_16"
       }
-      if(identical(x, c("id_13", "id_17"))){
+      if (identical(x, c("id_13", "id_17"))) {
         x <- "id_17"
       }
-      if(identical(x, c("id_14", "id_18"))){
+      if (identical(x, c("id_14", "id_18"))) {
         x <- "id_18"
       }
       return(x)

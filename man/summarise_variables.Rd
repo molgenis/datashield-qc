@@ -8,6 +8,10 @@ summarise_variables(available_dics, core_non_rep = "core_non_rep", conns)
 }
 \arguments{
 \item{available_dics}{A data frame containing available dictionary information.}
+
+\item{core_non_rep}{Character specifying name of core non repeated data set}
+
+\item{conns}{A datashield connections object}
 }
 \value{
 A data frame summarizing the total number of variables and the maximum sample size for each cohort.

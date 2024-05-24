@@ -26,6 +26,8 @@
 \item{edu_var}{The educational variable to be used.}
 
 \item{repeated_dfs}{A vector of data frames with repeated measures.}
+
+\item{conns}{A datashield connections object}
 }
 \value{
 A list containing combined demographic statistics.

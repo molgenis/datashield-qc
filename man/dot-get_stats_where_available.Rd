@@ -14,6 +14,8 @@
 \item{df}{The data frame from which to extract statistics.}
 
 \item{vars}{A vector of variables to extract statistics for.}
+
+\item{conns}{A datashield connections object}
 }
 \value{
 A list of statistics for the specified variables.

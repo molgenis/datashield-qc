@@ -8,6 +8,7 @@
 #' @param core_vars A vector of core variables to be extracted.
 #' @param edu_var The educational variable to be used.
 #' @param repeated_dfs A vector of data frames with repeated measures.
+#' @param conns A datashield connections object
 #'
 #' @return A list containing combined demographic statistics.
 #' @importFrom dsHelper dh.getStats dh.makeStrata
@@ -15,13 +16,14 @@
 #' @importFrom purrr pmap
 #' @export
 .get_demographics <- function(available_dics, core_df, yearly_df, core_vars, edu_var,
-                              repeated_dfs, conns){
+                              repeated_dfs, conns) {
   non_rep_stats <- .get_stats_where_available(
     available_dics = available_dics,
     filter_var = core_df,
     df = core_df,
     vars = core_vars,
-    conns = conns)
+    conns = conns
+  )
 
   .make_first_year_from_repeats(available_dics, yearly_df, edu_var = edu_var, conns = conns)
 
@@ -30,12 +32,14 @@
     filter_var = yearly_df,
     df = "df_year_1",
     vars = "edu_m_",
-    conns = conns)
+    conns = conns
+  )
 
   child_age_stats <- .get_child_age_range(
     available_dics = available_dics,
     repeated_dfs = repeated_dfs,
-    conns = conns)
+    conns = conns
+  )
 
   non_rep_stats_combined <- non_rep_stats %>% pmap(bind_rows)
   mat_ed_stats_combined <- mat_ed_stats %>% pmap(bind_rows)
@@ -58,7 +62,7 @@
 #' @return A data frame with the oldest and youngest ages formatted.
 #' @importFrom dplyr if_else
 #' @export
-.get_oldest_youngest_ages <- function(age_stats_combined, conns){
+.get_oldest_youngest_ages <- function(age_stats_combined, conns) {
   cohort <- NULL
   formatted <- age_stats_combined$continuous %>%
     dplyr::filter(cohort != "combined") %>%
@@ -79,15 +83,16 @@
 #' @param conns A datashield connections object
 #' @return A list of age statistics for children.
 #' @export
-.get_child_age_range <- function(available_dics, repeated_dfs, conns){
+.get_child_age_range <- function(available_dics, repeated_dfs, conns) {
   long_name <- NULL
   child_ages <- available_dics %>%
     dplyr::filter(long_name %in% repeated_dfs) %>%
-    pmap(function(cohort, long_name, ...){
+    pmap(function(cohort, long_name, ...) {
       dh.getStats(
         vars = "age_years",
         df = long_name,
-        conns = conns[cohort])
+        conns = conns[cohort]
+      )
     })
 
   return(child_ages)
@@ -101,20 +106,22 @@
 #' @param filter_var The variable used to filter the dictionary.
 #' @param df The data frame from which to extract statistics.
 #' @param vars A vector of variables to extract statistics for.
+#' @param conns A datashield connections object
 #'
 #' @return A list of statistics for the specified variables.
 #' @importFrom dplyr pull
 #' @export
-.get_stats_where_available <- function(available_dics, filter_var, df, vars, conns){
-long_name <- cohort <- NULL
+.get_stats_where_available <- function(available_dics, filter_var, df, vars, conns) {
+  long_name <- cohort <- NULL
   available_dics %>%
     dplyr::filter(long_name == filter_var) %>%
     pull(cohort) %>%
     map(
-      ~dh.getStats(
+      ~ dh.getStats(
         df = df,
         vars = vars,
-        conns = conns[.x])
+        conns = conns[.x]
+      )
     )
 }
 
@@ -125,24 +132,25 @@ long_name <- cohort <- NULL
 #' @param available_dics A data frame containing available dictionary information.
 #' @param year_rep_df The yearly data frame containing repeated measures.
 #' @param edu_var The educational variable to be used.
+#' @param conns A datashield connections object
 #' @importFrom dplyr pull
 #'
 #' @return None. The function modifies the data in place.
 #' @export
 .make_first_year_from_repeats <- function(available_dics, year_rep_df, edu_var,
-                                          conns){
-
+                                          conns) {
   long_name <- cohort <- NULL
   available_dics %>%
     dplyr::filter(long_name == year_rep_df) %>%
     pull(cohort) %>%
     map(
-      ~ds.dataFrameSubset(
+      ~ ds.dataFrameSubset(
         df.name = year_rep_df,
         V1.name = paste0(year_rep_df, "$age_years"),
         V2.name = "1",
         Boolean.operator = "<",
         newobj = "df_year_1",
-        datasources = conns[.x])
+        datasources = conns[.x]
+      )
     )
 }

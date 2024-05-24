@@ -9,13 +9,13 @@
 #' @importFrom purrr map_chr imap
 #' @importFrom tidyr pivot_wider
 #' @export
-format_dictionary_info <- function(coh_dics, all_dics){
-cohort <- . <- value <- long_name <- dictionary <- available <- NULL
+format_dictionary_info <- function(coh_dics, all_dics) {
+  cohort <- . <- value <- long_name <- dictionary <- available <- NULL
   formatted <- coh_dics %>%
     group_by(cohort) %>%
     group_split() %>%
-    set_names(map_chr(., ~.x$cohort[1])) %>%
-    map(~left_join(all_dics, .x, by = c("type", "name", "long_name"))) %>%
+    set_names(map_chr(., ~ .x$cohort[1])) %>%
+    map(~ left_join(all_dics, .x, by = c("type", "name", "long_name"))) %>%
     imap(~ .x %>% mutate(cohort = .y)) %>%
     bind_rows() %>%
     mutate(available = ifelse(is.na(value), "no", "yes")) %>%
@@ -23,7 +23,8 @@ cohort <- . <- value <- long_name <- dictionary <- available <- NULL
     dplyr::select(cohort, dictionary, available) %>%
     pivot_wider(
       names_from = cohort,
-      values_from = available)
+      values_from = available
+    )
 
   return(formatted)
 }

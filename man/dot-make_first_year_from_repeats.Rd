@@ -12,6 +12,8 @@
 \item{year_rep_df}{The yearly data frame containing repeated measures.}
 
 \item{edu_var}{The educational variable to be used.}
+
+\item{conns}{A datashield connections object}
 }
 \value{
 None. The function modifies the data in place.
