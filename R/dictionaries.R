@@ -12,12 +12,13 @@
 #' @importFrom DSI datashield.tables
 #' @return A final table containing cleaned and organized cohort dictionary information.
 #' @export
-identify_cohort_dics <- function(path_to_dic, conns) {
-  dictionaries <- list_all_dic_files(path_to_dic)
+identify_cohort_dics <- function(conns) {
+  dictionaries <- list_all_dic_files()
+  # dictionaries <- .list_all_dic_files_old(path_to_dic)
   dictionaries$ref <- paste0("id_", 1:nrow(dictionaries))
   elements <- .get_essential_dic_elements(dictionaries$name)
-  elements_split <- .split_essential_dic_elements(elements)
-  elements_split_with_type <- .join_split_dic_elements_with_type(elements_split, dictionaries$type)
+  # elements_split <- .split_essential_dic_elements(elements)
+  elements_split_with_type <- .join_split_dic_elements_with_type(elements, dictionaries$type)
   cohort_dics <- .get_cohort_dics(conns)
   ids <- .get_ids_for_everything(cohort_dics$value, elements_split_with_type, dictionaries$ref)
   clean_ids <- unlist(.clean_ids(ids))
@@ -27,6 +28,8 @@ identify_cohort_dics <- function(path_to_dic, conns) {
   return(final_table)
 }
 
+
+
 #' List All Dictionary Files
 #'
 #' This function lists all dictionary files available in the specified path by combining all the helper functions.
@@ -35,7 +38,72 @@ identify_cohort_dics <- function(path_to_dic, conns) {
 #'
 #' @return A data frame with all available dictionary files and their formatted names.
 #' @export
-list_all_dic_files <- function(path_to_dictionaries) {
+list_all_dic_files <- function() {
+  response <- .get_dics_from_api()
+  neat_response <- .format_response(response)
+  shorter_paths <- .shorten_paths(neat_response)
+  paths_as_tibble <- .split_paths_to_tibble(shorter_paths)
+  out <- .make_final_path_table(paths_as_tibble)
+  return(out)
+}
+
+.get_dics_from_api <- function(){
+  req <- request("https://api.github.com/repos/lifecycle-project/ds-dictionaries/git/trees/master?recursive=true")
+  resp <- req_perform(req)
+  content <- resp_body_json(resp)
+  return(content)
+}
+
+.format_response <- function(response){
+  paths <- content$tree %>% map_chr(~.$path)
+  return(paths)
+}
+
+.shorten_paths <- function(neat_response){
+  shorter <- neat_response %>%
+    str_subset(".xlsx") %>%
+    str_remove("dictionaries/")
+  return(shorter)
+}
+
+.split_paths_to_tibble <- function(shorter_paths){
+  paths_tibble <- shorter_paths %>%
+    str_split("/") %>%
+    map(t) %>%
+    map(as_tibble) %>%
+    bind_rows() %>%
+    set_names(c("type", "version", "file"))
+  return(paths_tibble)
+}
+
+.make_final_path_table <- function(paths_as_tibble){
+  out <- paths_as_tibble %>%
+  mutate(
+    name = str_remove(file, ".xlsx"),
+    name = str_remove(name, "\\b[_\\d]+")) %>%
+  dplyr::select(type, name) %>%
+  distinct() %>%
+    dplyr::filter(name != "peripheral_blood") ## Misnamed dictionary
+  return(out)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ .list_all_dic_files_old <- function(path_to_dictionaries){
+
   types <- .list_dictionary_types(path_to_dictionaries)
   latest <- types %>% map_chr(.list_latest_version)
   files <- latest %>% map(.list_available_dics)
@@ -152,14 +220,16 @@ list_all_dic_files <- function(path_to_dictionaries) {
 #' @param cohort_table_with_ids Data frame containing cohort table with IDs.
 #' @return A final dictionary table.
 #' @noRd
-.make_final_dic_table <- function(cohort_table_with_ids) {
+.make_final_dic_table <- function(cohort_table_with_labels) {
   ref <- desc <- value <- cohort <- NULL
-  neat_table <- cohort_table_with_ids %>%
+  neat_table <- cohort_table_with_labels %>%
     group_by(cohort, ref) %>%
     arrange(desc(value)) %>%
     group_split() %>%
     map(~ slice(., 1)) %>%
-    bind_rows()
+    bind_rows() %>%
+    mutate(long_name = paste0(type, "_", name))
+  return(neat_table)
 }
 
 #' Get Essential Dictionary Elements
@@ -270,9 +340,6 @@ list_all_dic_files <- function(path_to_dictionaries) {
       if (identical(x, character(0))) {
         x <- NA
       }
-      if (identical(x, c("id_11", "id_15"))) {
-        x <- "id_15"
-      }
       if (identical(x, c("id_12", "id_16"))) {
         x <- "id_16"
       }
@@ -280,7 +347,10 @@ list_all_dic_files <- function(path_to_dictionaries) {
         x <- "id_17"
       }
       if (identical(x, c("id_14", "id_18"))) {
-        x <- "id_18"
+        x <- "id_17"
+      }
+      if (identical(x, c("id_15", "id_19"))) {
+        x <- "id_19"
       }
       return(x)
     })

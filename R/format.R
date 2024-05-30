@@ -28,3 +28,16 @@ format_dictionary_info <- function(coh_dics, all_dics) {
 
   return(formatted)
 }
+
+.get_parent_label <- function(vars, keywords){
+
+  keep_going <- TRUE
+
+  while(keep_going == TRUE){
+    vars <- left_join(vars, keywords, by = "keywords") %>%
+      mutate(keywords = if_else(!is.na(parent), parent, keywords))
+    keep_going <- !all(map_lgl(vars$parent, is.na))
+    vars <- vars %>% dplyr::select(-parent)
+  }
+  return(vars)
+}
