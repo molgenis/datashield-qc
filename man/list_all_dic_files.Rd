@@ -4,10 +4,7 @@
 \alias{list_all_dic_files}
 \title{List All Dictionary Files}
 \usage{
-list_all_dic_files(path_to_dictionaries)
-}
-\arguments{
-\item{path_to_dictionaries}{The path to the directory containing dictionaries.}
+list_all_dic_files()
 }
 \value{
 A data frame with all available dictionary files and their formatted names.

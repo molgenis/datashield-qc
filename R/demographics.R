@@ -60,7 +60,7 @@
 #' @param age_stats_combined A data frame containing combined age statistics.
 #' @param conns A datashield connections object
 #' @return A data frame with the oldest and youngest ages formatted.
-#' @importFrom dplyr if_else
+#' @importFrom dplyr if_else mutate
 #' @export
 .get_oldest_youngest_ages <- function(age_stats_combined, conns) {
   cohort <- NULL

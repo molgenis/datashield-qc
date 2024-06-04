@@ -18,4 +18,6 @@ Imports:
   dsBaseClient,
   rlang,
   tibble,
-  tidyr
+  tidyr,
+  httr2,
+  cli

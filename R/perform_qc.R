@@ -4,7 +4,8 @@
 #' retrieves dictionary information, assigns variables, fetches variable statistics, and obtains key demographics.
 #'
 #' @param conns A list of DataShield connections.
-#'
+#' @importFrom cli cli_h1 cli_alert_info
+#' @importFrom DSI datashield.pkg_status
 #' @return A list containing:
 #' \item{packages}{Information about the DataShield packages available.}
 #' \item{variables}{Statistics for the all variables.}
@@ -12,6 +13,9 @@
 #' @export
 perform_qc <- function(conns){
   options(datashield.progress = F)
+  ## Find out how to suppress the bar with percentages
+
+  ## Add a nice message at the top
 
   cli_h1("Fetching package information")
   packages <- datashield.pkg_status(conns)
@@ -54,7 +58,3 @@ perform_qc <- function(conns){
   return(out)
 
 }
-
-objects <- perform_qc(conns)
-
-

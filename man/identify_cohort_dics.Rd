@@ -4,11 +4,9 @@
 \alias{identify_cohort_dics}
 \title{Identify Cohort Dictionaries}
 \usage{
-identify_cohort_dics(path_to_dic, conns)
+identify_cohort_dics(conns)
 }
 \arguments{
-\item{path_to_dic}{The path to the directory containing the dictionary files.}
-
 \item{conns}{The connections object to the database where the data tables are stored.}
 }
 \value{

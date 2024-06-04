@@ -7,7 +7,7 @@
 #'   The data frame should include columns `long_name`, `value`, and `cohort`.
 #' @param conns A list of DataSHIELD connections indexed by cohort.
 #' @return None. This function is called for its side effects of assigning tables to connections.
-#' @importFrom purrr pmap
+#' @importFrom purrr pwalk
 #' @importFrom DSI datashield.assign.table
 #' @export
 #' @export
