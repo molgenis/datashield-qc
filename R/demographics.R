@@ -24,7 +24,6 @@
     vars = core_vars,
     conns = conns
   )
-
   .make_first_year_from_repeats(available_dics, yearly_df, edu_var = edu_var, conns = conns)
 
   mat_ed_stats <- .get_stats_where_available(
@@ -60,7 +59,7 @@
 #' @param age_stats_combined A data frame containing combined age statistics.
 #' @param conns A datashield connections object
 #' @return A data frame with the oldest and youngest ages formatted.
-#' @importFrom dplyr if_else mutate
+#' @importFrom dplyr if_else mutate n
 #' @export
 .get_oldest_youngest_ages <- function(age_stats_combined, conns) {
   cohort <- NULL
@@ -134,6 +133,7 @@
 #' @param edu_var The educational variable to be used.
 #' @param conns A datashield connections object
 #' @importFrom dplyr pull
+#' @importFrom dsBaseClient ds.dataFrameSubset
 #'
 #' @return None. The function modifies the data in place.
 #' @export
@@ -144,7 +144,7 @@
     dplyr::filter(long_name == year_rep_df) %>%
     pull(cohort) %>%
     map(
-      ~ ds.dataFrameSubset(
+      ~ dsBaseClient::ds.dataFrameSubset(
         df.name = year_rep_df,
         V1.name = paste0(year_rep_df, "$age_years"),
         V2.name = "1",

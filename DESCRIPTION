@@ -20,4 +20,5 @@ Imports:
   tibble,
   tidyr,
   httr2,
-  cli
+  cli, 
+  MolgenisArmadillo

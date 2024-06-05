@@ -3,25 +3,67 @@
 #' This function summarizes the variables available in the dictionaries by counting the total variables and
 #' getting the maximum sample size for each cohort.
 #'
-#' @param available_dics A data frame containing available dictionary information.
-#' @param core_non_rep Character specifying name of core non repeated data set
-#' @param conns A datashield connections object
+#' @param qc_stats output from qc stats
 #' @importFrom dplyr case_when
 #' @return A data frame summarizing the total number of variables and the maximum sample size for each cohort.
 #' @export
-summarise_variables <- function(available_dics, core_non_rep = "core_non_rep", conns) {
-  cols <- .get_all_columns(available_dics, conns)
-  cols_formatted <- .format_columns(cols)
-  lengths <- .get_max_sample(core_non_rep, conns)
-  counts <- .count_variable(cols_formatted)
-  var_summary <- left_join(counts, lengths, by = "cohort")
-  summary_flipped <- .flip_rows_columns(var_summary)
-  out <- summary_flipped %>%
-    mutate(measure = case_when(
-      measure == "total_vars" ~ "Number of variables",
-      measure == "max_obs" ~ "Maximum number of participants"
-    ))
+summarise_variables <- function(qc_stats) {
+  n_vars <- .count_vars(qc_stats)
+  max_obs <- .get_max_obs(qc_stats)
+  combined <- left_join(n_vars, max_obs, by = "cohort")
+  transposed <- .flip_rows_columns(combined)
+  out <- .rename_vars(transposed)
   return(out)
+}
+
+#' Count Variables per Cohort
+#'
+#' This function counts the number of distinct variables for each cohort in the provided QC statistics data.
+#'
+#' @param qc_stats A list containing QC statistics data. It is expected that `qc_stats` has a component named `variables`
+#'   which is a list of data frames. Each data frame should contain at least the columns `cohort` and `variable`.
+#'
+#' @return A tibble with two columns: `cohort` and `total_vars`. Each row represents a cohort and the number of distinct
+#'   variables associated with that cohort.
+#'
+#' @importFrom dplyr %>% n
+#' @importFrom purrr pmap
+#' @export
+.count_vars <- function(qc_stats) {
+  cohort <- NULL
+  n_vars <- qc_stats$variables %>%
+    purrr::pmap(dplyr::bind_rows) %>%
+    purrr::map(~dplyr::select(., cohort, variable)) %>%
+    dplyr::bind_rows() %>%
+    dplyr::filter(cohort != "combined") %>%
+    dplyr::distinct() %>%
+    dplyr::group_by(cohort) %>%
+    dplyr::summarise(total_vars = n())
+
+  return(n_vars)
+}
+
+#' Get Maximum Sample Size
+#'
+#' This function retrieves the maximum sample size for each cohort from a non-repeated measures data frame.
+#'
+#' @param non_rep_df The non-repeated measures data frame.
+#' @param conns A datashield connections object
+#' @return A data frame with the maximum sample size for each cohort.
+#' @importFrom dsBaseClient ds.dim
+#' @importFrom dplyr filter
+#' @noRd
+.get_max_obs <- function(qc_stats) {
+  cohort <- valid_n <- max_obs <- NULL
+  max_sample <- qc_stats$variables$core_non_rep$continuous %>%
+    group_by(cohort) %>%
+    arrange(valid_n) %>%
+    slice(1) %>%
+    dplyr::rename("max_obs" = "cohort_n") %>%
+    filter(cohort != "combined") %>%
+    dplyr::select(cohort, max_obs)
+
+  return(max_sample)
 }
 
 #' Flip Rows and Columns in a Summary Table
@@ -51,89 +93,24 @@ summarise_variables <- function(available_dics, core_non_rep = "core_non_rep", c
   return(flipped)
 }
 
-
-#' Get Maximum Sample Size
+#' Rename Variables in Transposed Data
 #'
-#' This function retrieves the maximum sample size for each cohort from a non-repeated measures data frame.
+#' This function renames certain values in the `measure` column of the transposed data.
 #'
-#' @param non_rep_df The non-repeated measures data frame.
-#' @param conns A datashield connections object
-#' @return A data frame with the maximum sample size for each cohort.
-#' @importFrom dsBaseClient ds.dim
-#' @noRd
-.get_max_sample <- function(non_rep_df, conns) {
-  cohort <- NULL
-  lengths <- ds.dim(non_rep_df)
+#' @param transposed A data frame containing a column named `measure`. The values in this column will be modified based on specific conditions.
+#' @return A data frame with the `measure` column values renamed:
+#'   "total_vars" is renamed to "Number of variables" and "max_obs" is renamed to "Maximum number of participants".
+#' @importFrom dplyr case_when
+#' @export
+.rename_vars <- function(transposed) {
+  out <- transposed %>%
+    dplyr::mutate(measure = dplyr::case_when(
+      measure == "total_vars" ~ "Number of variables",
+      measure == "max_obs" ~ "Maximum number of participants"
+    ))
 
-  lengths_formatted <- lengths %>%
-    set_names(c(names(conns), "combined")) %>%
-    map(~ .[1]) %>%
-    map(as_tibble) %>%
-    bind_rows(.id = "cohort") %>%
-    dplyr::rename("max_obs" = "value") %>%
-    dplyr::filter(cohort != "combined")
-
-  return(lengths_formatted)
+  return(out)
 }
 
-#' Count Variables
-#'
-#' This function counts the total number of variables available in the formatted columns for each cohort.
-#'
-#' @param cols_formatted A data frame containing formatted columns.
-#'
-#' @return A data frame with the total number of variables for each cohort.
-#' @importFrom dplyr group_by reframe n
-#' @noRd
-.count_variable <- function(cols_formatted) {
-  cohort <- NULL
-  counts <- cols_formatted %>%
-    group_by(cohort) %>%
-    reframe(
-      total_vars = n()
-    )
-  return(counts)
-}
 
-#' Get All Columns
-#'
-#' This function retrieves all column names from the available dictionaries for each cohort.
-#'
-#' @param available_dics A data frame containing available dictionary information.
-#' @param conns A datashield connections object
-#' @return A named list of column names for each dictionary.
-#' @importFrom dsBaseClient ds.colnames
-#' @importFrom rlang set_names
-#' @noRd
-.get_all_columns <- function(available_dics, conns) {
-  available_dics %>%
-    pmap(function(cohort, long_name, ...) {
-      ds.colnames(long_name, datasources = conns[cohort])
-    }) %>%
-    set_names(available_dics$long_name)
-}
 
-#' Format Columns
-#'
-#' This function formats the retrieved column names into a tidy data frame.
-#'
-#' @param columns A named list of column names for each dictionary.
-#'
-#' @return A data frame with formatted column names.
-#' @importFrom tibble as_tibble
-#' @importFrom tidyr pivot_longer
-#' @noRd
-.format_columns <- function(columns) {
-  formatted <- columns %>%
-    map(as_tibble) %>%
-    map(
-      ~ pivot_longer(
-        data = .,
-        everything(),
-        names_to = "cohort",
-        values_to = "variable"
-      )
-    ) %>%
-    bind_rows(.id = "df")
-  return(formatted)
-}

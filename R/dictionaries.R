@@ -13,18 +13,10 @@
 #' @export
 identify_cohort_dics <- function(conns) {
   dictionaries <- list_all_dic_files()
-  # dictionaries <- .list_all_dic_files_old(path_to_dic)
-  dictionaries$ref <- paste0("id_", 1:nrow(dictionaries))
-  elements <- .get_essential_dic_elements(dictionaries$name)
-  # elements_split <- .split_essential_dic_elements(elements)
-  elements_split_with_type <- .join_split_dic_elements_with_type(elements, dictionaries$type)
   cohort_dics <- .get_cohort_dics(conns)
-  ids <- .get_ids_for_everything(cohort_dics$value, elements_split_with_type, dictionaries$ref)
-  clean_ids <- unlist(.clean_ids(ids))
-  cohort_table_with_ids <- .join_ids_with_cohort_table(cohort_dics, clean_ids)
-  cohort_table_with_labels <- .join_labels_with_cohort_table(cohort_table_with_ids, dictionaries)
-  final_table <- .make_final_dic_table(cohort_table_with_labels)
-  return(final_table)
+  matched_dics <- .match_cohort_dictionaries_with_ref(dictionaries, cohort_dics)
+  formatted <- .make_final_dic_table(matched_dics)
+  return(formatted)
 }
 
 #' List All Dictionary Files
@@ -48,7 +40,7 @@ list_all_dic_files <- function() {
 #'
 #' @importFrom httr2 request req_perform resp_body_json
 #' @return A list containing the JSON response from the GitHub API.
-#' @export
+#' @noRd
 .get_dics_from_api <- function(){
   req <- request("https://api.github.com/repos/lifecycle-project/ds-dictionaries/git/trees/master?recursive=true")
   resp <- req_perform(req)
@@ -62,7 +54,7 @@ list_all_dic_files <- function() {
 #'
 #' @param response A list containing the JSON response from the GitHub API.
 #' @return A character vector of file paths.
-#' @export
+#' @noRd
 .format_response <- function(response){
   paths <- response$tree %>% map_chr(~.$path)
   return(paths)
@@ -75,7 +67,7 @@ list_all_dic_files <- function() {
 #' @param neat_response A character vector of file paths.
 #' @importFrom stringr str_subset str_remove
 #' @return A character vector of shortened file paths.
-#' @export
+#' @noRd
 .shorten_paths <- function(neat_response){
   shorter <- neat_response %>%
     str_subset(".xlsx") %>%
@@ -89,7 +81,7 @@ list_all_dic_files <- function() {
 #'
 #' @param shorter_paths A character vector of shortened file paths.
 #' @return A tibble with columns `type`, `version`, and `file`.
-#' @export
+#' @noRd
 .split_paths_to_tibble <- function(shorter_paths){
   paths_tibble <- shorter_paths %>%
     str_split("/") %>%
@@ -107,42 +99,65 @@ list_all_dic_files <- function() {
 #' @param paths_as_tibble A tibble with columns `type`, `version`, and `file`.
 #' @importFrom dplyr mutate distinct
 #' @return A tibble with columns `type` and `name`.
-#' @export
+#' @noRd
 .make_final_path_table <- function(paths_as_tibble){
-  name <- type <- NULL
+  name <- type <- ref <- long_name <- NULL
   out <- paths_as_tibble %>%
+    dplyr::filter(file != "1_1_peripheral_blood.xlsx") %>% ## Misnamed dictionary
+    .strip_excess_from_name() %>%
+    .make_long_name() %>%
+    dplyr::select(type, name, long_name) %>%
+    distinct() %>%
+    .add_id() %>%
+    dplyr::select(type, name, long_name, ref) %>%
+    return(out)
+}
+
+#' Strip Excess Characters from File Name
+#'
+#' This function removes specified patterns from the `file` column of a tibble to create a cleaned `name` column.
+#'
+#' @param paths_as_tibble A tibble with a column named `file` containing file paths.
+#'
+#' @return A tibble with a new column `name` where excess characters have been stripped.
+#' @noRd
+.strip_excess_from_name <- function(paths_as_tibble){
+  name <- NULL
+  stripped <- paths_as_tibble %>%
     mutate(
       name = str_remove(file, ".xlsx"),
-      name = str_remove(name, "\\b[_\\d]+")) %>%
-    dplyr::select(type, name) %>%
-    distinct() %>%
-    dplyr::filter(name != "peripheral_blood") ## Misnamed dictionary
+      name = str_remove(name, "\\b[_\\d]+"),
+      name = str_remove_all(name, "_rep"))
+  return(stripped)
+}
+
+#' Create Long Name by Concatenating Type and Name
+#'
+#' This function concatenates the `type` and `name` columns of a tibble to create a new `long_name` column.
+#'
+#' @param stripped A tibble with columns `type` and `name`.
+#'
+#' @return A tibble with a new column `long_name`.
+#' @noRd
+.make_long_name <- function(stripped){
+  type <- name <- NULL
+  out <- stripped %>%
+    mutate(long_name = paste0(type, "_", name))
   return(out)
 }
 
-#' Get Essential Dictionary Elements
+#' Add ID Column to Tibble
 #'
-#' @param dictionaries Vector containing dictionary names.
-#' @return A vector of essential dictionary elements.
-#' @noRd
-.get_essential_dic_elements <- function(dictionaries) {
-  stems <- str_remove_all(dictionaries, "^[\\d_]+")
-  stems <- str_remove_all(stems, "_rep$")
-  return(stems)
-}
-
-#' Join Split Dictionary Elements with Type
+#' This function adds a `ref` column to a tibble, containing unique IDs for each row.
 #'
-#' @param split_dic_elements List containing split dictionary elements.
-#' @param types Vector containing dictionary types.
-#' @return A list of split dictionary elements with types.
+#' @param paths_as_tibble A tibble.
+#' @importFrom dplyr row_number
+#' @return A tibble with a new column `ref` containing unique IDs.
 #' @noRd
-.join_split_dic_elements_with_type <- function(split_dic_elements, types) {
-  all_dic_parts <- list(split_dic_elements, types) %>%
-    pmap(function(.x, .y) {
-      out <- c(.x[[1]], .y)
-      return(out)
-    })
+.add_id <- function(paths_as_tibble){
+  out <- paths_as_tibble %>%
+    mutate(ref = paste0("id_", row_number()))
+  return(out)
 }
 
 #' Get Cohort Dictionaries
@@ -157,31 +172,193 @@ list_all_dic_files <- function() {
   return(coh_tables)
 }
 
-#' Get IDs for Everything
+#' Match Cohort Dictionaries with Reference
 #'
-#' @param dic_vec Vector containing dictionary elements.
-#' @param all_dic_parts List containing all dictionary parts.
-#' @param id_refs Vector containing ID references.
-#' @return A vector of IDs for all elements.
+#' This function matches cohort dictionaries with reference dictionaries, joins IDs, and adds labels.
+#'
+#' @param reference_dics A tibble containing reference dictionaries.
+#' @param cohort_dics A tibble containing cohort dictionaries.
+#'
+#' @return A tibble with cohort dictionaries matched and labeled.
 #' @noRd
-.get_ids_for_everything <- function(dic_vec, all_dic_parts, id_refs) {
-  dic_vec %>%
-    map(~ .summarise_which_dic_matched(.x, all_dic_parts, id_refs))
+.match_cohort_dictionaries_with_ref <- function(reference_dics, cohort_dics){
+  all_matches <- .get_all_dictionary_matches(reference_dics, cohort_dics)
+  all_matches_clean <- .clean_ids(all_matches)
+  ref_with_matches <- .join_ids_with_cohort_table(cohort_dics, all_matches_clean)
+  ref_with_labels <- .join_labels_with_cohort_table(ref_with_matches, reference_dics)
+  return(ref_with_labels)
+}
+
+#' Get All Dictionary Matches
+#'
+#' This function gets all matches between dictionaries and cohort dictionaries.
+#'
+#' @param dictionaries A tibble containing reference dictionaries.
+#' @param cohort_dics A tibble containing cohort dictionaries.
+#'
+#' @return A list of all matches.
+#' @noRd
+.get_all_dictionary_matches <- function(dictionaries, cohort_dics){
+  all_matches <- cohort_dics$value %>%
+    map(~.get_single_dictionary_match(dictionaries, .x))
+}
+
+#' Get Single Dictionary Match
+#'
+#' This function gets a single match between a reference dictionary and a cohort dictionary.
+#'
+#' @param dictionaries A tibble containing reference dictionaries.
+#' @param single_cohort_dic A single cohort dictionary to match.
+#'
+#' @return A character vector of matched IDs.
+#' @noRd
+.get_single_dictionary_match <- function(dictionaries, single_cohort_dic){
+  match <- .check_cohort_dic_with_all_possible(dictionaries$long_name, single_cohort_dic)
+  id <- .get_id_from_match(dictionaries$ref, match)
+  return(id)
+}
+
+#' Get ID from Match
+#'
+#' This function retrieves the ID corresponding to matched reference dictionary entries.
+#'
+#' @param ids A vector of IDs from reference dictionaries.
+#' @param matches A logical vector indicating which entries in the reference dictionaries matched.
+#'
+#' @return A vector of matched IDs.
+#' @export
+.get_id_from_match <- function(ids, matches){
+  match_id <- ids[matches]
+  return(match_id)
+}
+
+
+#' Check Cohort Dictionary with All Possible Matches
+#'
+#' This function checks a cohort dictionary against all possible reference dictionary matches.
+#'
+#' @param long_names A character vector of long names from reference dictionaries.
+#' @param single_cohort_dic A single cohort dictionary to check.
+#'
+#' @return A logical vector indicating if a match is found.
+#' @noRd
+.check_cohort_dic_with_all_possible <- function(long_names, single_cohort_dic){
+  all_possible_matches <- long_names %>%
+    map_lgl(~.check_single_match(.x, single_cohort_dic))
+}
+
+#' Check Single Match Between Reference and Cohort Dictionary
+#'
+#' This function checks if a single reference dictionary long name matches a single cohort dictionary.
+#'
+#' @param single_ref_long_name A single long name from a reference dictionary.
+#' @param single_cohort_dic A single cohort dictionary to check.
+#'
+#' @return A logical value indicating if all components match.
+#' @noRd
+.check_single_match <- function(single_ref_long_name, single_cohort_dic){
+  components <- .extract_reference_components(single_ref_long_name)
+  any_match <- .check_if_any_components_match(single_cohort_dic, components)
+  all_match <- .check_if_all_components_match(any_match)
+  return(all_match)
+}
+
+#' Extract Reference Components
+#'
+#' This function extracts the components of a reference dictionary long name.
+#'
+#' @param long_name A long name from a reference dictionary.
+#'
+#' @return A character matrix of components.
+#' @noRd
+.extract_reference_components <- function(long_name){
+  components <- str_split(long_name, "_", simplify = TRUE)
+  return(components)
+}
+
+#' Check if Any Components Match
+#'
+#' This function checks if any components of a reference dictionary long name match a cohort dictionary.
+#'
+#' @param single_cohort_dic A single cohort dictionary.
+#' @param components A character matrix of components from a reference dictionary long name.
+#'
+#' @return A list of logical values indicating if each component matches.
+#' @noRd
+.check_if_any_components_match <- function(single_cohort_dic, components){
+  any_match <- components %>%
+    map(~.check_if_component_matches(single_cohort_dic, .x))
+  return(any_match)
+}
+
+#' Check if Component Matches
+#'
+#' This function checks if a single component of a reference dictionary long name matches a cohort dictionary.
+#'
+#' @param single_cohort_dic A single cohort dictionary.
+#' @param single_ref_component A single component from a reference dictionary long name.
+#'
+#' @return A logical value indicating if the component matches.
+#' @noRd
+.check_if_component_matches <- function(single_cohort_dic, single_ref_component){
+  match_present <- str_detect(single_cohort_dic, single_ref_component)
+  return(match_present)
+}
+
+#' Check if All Components Match
+#'
+#' This function checks if all components of a reference dictionary long name match a cohort dictionary.
+#'
+#' @param any_match A list of logical values indicating if each component matches.
+#'
+#' @return A logical value indicating if all components match.
+#' @noRd
+.check_if_all_components_match <- function(any_match){
+  all_match <- all(unlist(any_match))
+}
+
+#' Join Labels with Cohort Table
+#'
+#' This function joins labels from reference dictionaries with cohort dictionaries based on `ref` column.
+#'
+#' @param coh_dics A tibble containing cohort dictionaries.
+#' @param dictionaries A tibble containing reference dictionaries with labels.
+#'
+#' @return A tibble with labels joined to cohort dictionaries.
+#' @noRd
+.join_labels_with_cohort_table <- function(coh_dics, dictionaries) {
+  with_labels <- left_join(coh_dics, dictionaries, by = "ref")
+  return(with_labels)
+}
+
+#' Join IDs with Cohort Table
+#'
+#' This function joins IDs with cohort dictionaries.
+#'
+#' @param cohort_dics A tibble containing cohort dictionaries.
+#' @param clean_ids A vector of cleaned IDs to join.
+#'
+#' @return A tibble with IDs joined to cohort dictionaries.
+#' @noRd
+.join_ids_with_cohort_table <- function(cohort_dics, clean_ids) {
+  with_ids <- cohort_dics %>%
+    mutate(ref = clean_ids)
+  return(with_ids)
 }
 
 #' Clean IDs
 #'
-#' @param ids Vector containing IDs.
-#' @return Cleaned IDs.
+#' This function cleans IDs by handling specific cases and replacing them with appropriate values.
+#'
+#' @param ids A list of IDs to be cleaned.
+#'
+#' @return A cleaned vector of IDs.
 #' @noRd
 .clean_ids <- function(ids) {
   ids_clean <- ids %>%
     map(function(x) {
       if (identical(x, character(0))) {
         x <- NA
-      }
-      if (identical(x, c("id_12", "id_16"))) {
-        x <- "id_16"
       }
       if (identical(x, c("id_13", "id_17"))) {
         x <- "id_17"
@@ -192,9 +369,13 @@ list_all_dic_files <- function() {
       if (identical(x, c("id_15", "id_19"))) {
         x <- "id_19"
       }
+      if (identical(x, c("id_16", "id_20"))) {
+        x <- "id_20"
+      }
+
       return(x)
     })
-  return(ids_clean)
+  return(unlist(ids_clean))
 }
 
 #' Join IDs with Cohort Table

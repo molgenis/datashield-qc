@@ -12,7 +12,6 @@
 #' @export
 #' @export
 assign_where_available <- function(available_dics, conns){
-  invisible(
     available_dics %>%
       pwalk(function(long_name, value, cohort, ...){
         datashield.assign.table(
@@ -20,5 +19,4 @@ assign_where_available <- function(available_dics, conns){
           table = value,
           conns = conns[cohort])
       })
-  )
 }

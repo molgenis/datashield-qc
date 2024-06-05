@@ -3,57 +3,54 @@
 #' This function performs a series of quality control checks on DataShield connections. It fetches package information,
 #' retrieves dictionary information, assigns variables, fetches variable statistics, and obtains key demographics.
 #'
-#' @param conns A list of DataShield connections.
+#' @param login_data Tibble of server info.
 #' @importFrom cli cli_h1 cli_alert_info
 #' @importFrom DSI datashield.pkg_status
+#' @importFrom rlang set_names
 #' @return A list containing:
 #' \item{packages}{Information about the DataShield packages available.}
 #' \item{variables}{Statistics for the all variables.}
 #' \item{demographics}{Specific demographic information.}
 #' @export
-perform_qc <- function(conns){
+.get_qc_stats <- function(login_data){
   options(datashield.progress = F)
   ## Find out how to suppress the bar with percentages
 
   ## Add a nice message at the top
+  cli_h1("Performing DataSHIELD QC")
+
+  cli_h1("Checking if servers are reachable")
+  accessible <- .check_server_up(login_data)
+
+  cli_h1("Logging in")
+  login_return <- .login_qc(login_data)
 
   cli_h1("Fetching package information")
-  packages <- datashield.pkg_status(conns)
+  packages <- datashield.pkg_status(login_return$conns)
 
   cli_h1("Getting dictionary information")
   all_possible_dictionaries <- list_all_dic_files()
-  cohort_dics_available <- identify_cohort_dics(conns)
+  cohort_dics_available <- identify_cohort_dics(login_return$conns)
 
   cli_h1("Assigning variables")
-  assign_where_available(cohort_dics_available, conns)
+  assign_where_available(cohort_dics_available, login_return$conns)
 
   cli_h1("Fetching variable information")
   all_vars <- cohort_dics_available %>%
     pmap(function(cohort, long_name, ...) {
       cli_alert_info(paste0("\nTable ", long_name))
-      invisible(
         dh.getStats(
           df = long_name,
-          conns = conns[cohort])
-      )
+          conns = login_return$conns[cohort])
     })
 
-  cli_h1("Fetching additional demographics")
-  ### This should be done in the formatting stage, don't get core demographics twice
-  demographics <- .get_demographics(
-    available_dics = cohort_dics_available,
-    core_df = "core_non_rep",
-    yearly_df = "core_yearly_rep",
-    core_vars = c("agebirth_m_y", "ethn3_m", "sex"),
-    edu_var = "edu_m_",
-    repeated_dfs <- c("chemicals_ath_yearly_rep", "core_yearly_rep", "outcome_yearly_rep",
-                      "outcome_ath_yearly_rep", "urban_ath_yearly_rep"),
-    conns = conns)
+  all_vars <- all_vars %>% set_names(cohort_dics_available$long_name)
 
   out <- list(
     packages = packages,
-    variables = all_vars,
-    demographics = demographics)
+    coh_dics = cohort_dics_available,
+    all_dics = all_possible_dictionaries,
+    variables = all_vars)
 
   return(out)
 

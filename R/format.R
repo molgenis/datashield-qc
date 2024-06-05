@@ -9,6 +9,7 @@
 #' @importFrom purrr map_chr imap
 #' @importFrom tidyr pivot_wider
 #' @importFrom dplyr mutate
+#' @importFrom rlang set_names
 #' @export
 format_dictionary_info <- function(coh_dics, all_dics) {
   cohort <- . <- value <- long_name <- dictionary <- available <- NULL
