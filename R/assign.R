@@ -12,11 +12,14 @@
 #' @export
 #' @export
 assign_where_available <- function(available_dics, conns){
-    available_dics %>%
-      pwalk(function(long_name, value, cohort, ...){
-        datashield.assign.table(
-          symbol = long_name,
-          table = value,
-          conns = conns[cohort])
-      })
+      available_dics %>%
+        pwalk(function(long_name, value, cohort, ...){
+          cli_alert_info(long_name)
+          suppressMessages(
+            datashield.assign.table(
+              symbol = long_name,
+              table = value,
+              conns = conns[cohort])
+          )
+        })
 }

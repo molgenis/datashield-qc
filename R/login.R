@@ -102,7 +102,7 @@
 #' @param token_values A data frame containing the token values to be joined with the Armadillo credentials. It should include a column `cohort` to join on.
 #'
 #' @return A data frame of Armadillo credentials with the token values joined.
-#' @export
+#' @noRd
 .join_tokens_with_credentials <- function(credentials_split, token_values){
   armadillo_credentials <- left_join(credentials_split$armadillo, token_values, by = "cohort")
   return(armadillo_credentials)
@@ -173,7 +173,7 @@
 #' @param builder An object used to build the login data.
 #' @importFrom dplyr group_by group_split
 #' @return A list of tibbles, each containing login data for a specific server.
-#' @export
+#' @noRd
 .split_login_object <- function(builder){
   server <- NULL
   split <- builder$build() %>%
@@ -194,9 +194,13 @@
 #' @noRd
 .handle_login <- function(login_data){
   login_safely <- safely(datashield.login)
-  login_result <- login_data %>%
-    map(~login_safely(.x, assign = F)) %>%
-    set_names(login_data %>% map("server"))
+  suppressMessages(
+    suppressWarnings(
+      login_result <- login_data %>%
+        map(~login_safely(.x, assign = F)) %>%
+        set_names(login_data %>% map("server"))
+    )
+  )
   return(login_result)
 }
 

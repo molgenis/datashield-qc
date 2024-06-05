@@ -12,11 +12,9 @@
 #' \item{variables}{Statistics for the all variables.}
 #' \item{demographics}{Specific demographic information.}
 #' @export
-.get_qc_stats <- function(login_data){
+run_qc <- function(login_data){
   options(datashield.progress = F)
-  ## Find out how to suppress the bar with percentages
 
-  ## Add a nice message at the top
   cli_h1("Performing DataSHIELD QC")
 
   cli_h1("Checking if servers are reachable")
@@ -28,7 +26,7 @@
   cli_h1("Fetching package information")
   packages <- datashield.pkg_status(login_return$conns)
 
-  cli_h1("Getting dictionary information")
+  cli_h1("Fetching table information")
   all_possible_dictionaries <- list_all_dic_files()
   cohort_dics_available <- identify_cohort_dics(login_return$conns)
 
@@ -36,15 +34,7 @@
   assign_where_available(cohort_dics_available, login_return$conns)
 
   cli_h1("Fetching variable information")
-  all_vars <- cohort_dics_available %>%
-    pmap(function(cohort, long_name, ...) {
-      cli_alert_info(paste0("\nTable ", long_name))
-        dh.getStats(
-          df = long_name,
-          conns = login_return$conns[cohort])
-    })
-
-  all_vars <- all_vars %>% set_names(cohort_dics_available$long_name)
+  all_vars <- .get_stats_all_tables(cohort_dics_available, login_return$conns)
 
   out <- list(
     packages = packages,

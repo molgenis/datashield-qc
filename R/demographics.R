@@ -60,7 +60,7 @@
 #' @param conns A datashield connections object
 #' @return A data frame with the oldest and youngest ages formatted.
 #' @importFrom dplyr if_else mutate n
-#' @export
+#' @noRd
 .get_oldest_youngest_ages <- function(age_stats_combined, conns) {
   cohort <- NULL
   formatted <- age_stats_combined$continuous %>%
@@ -81,7 +81,7 @@
 #' @param repeated_dfs A vector of data frames with repeated measures.
 #' @param conns A datashield connections object
 #' @return A list of age statistics for children.
-#' @export
+#' @noRd
 .get_child_age_range <- function(available_dics, repeated_dfs, conns) {
   long_name <- NULL
   child_ages <- available_dics %>%
@@ -109,7 +109,7 @@
 #'
 #' @return A list of statistics for the specified variables.
 #' @importFrom dplyr pull
-#' @export
+#' @noRd
 .get_stats_where_available <- function(available_dics, filter_var, df, vars, conns) {
   long_name <- cohort <- NULL
   available_dics %>%
@@ -136,7 +136,7 @@
 #' @importFrom dsBaseClient ds.dataFrameSubset
 #'
 #' @return None. The function modifies the data in place.
-#' @export
+#' @noRd
 .make_first_year_from_repeats <- function(available_dics, year_rep_df, edu_var,
                                           conns) {
   long_name <- cohort <- NULL

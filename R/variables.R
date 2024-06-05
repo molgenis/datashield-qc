@@ -28,7 +28,7 @@ summarise_variables <- function(qc_stats) {
 #'
 #' @importFrom dplyr %>% n
 #' @importFrom purrr pmap
-#' @export
+#' @noRd
 .count_vars <- function(qc_stats) {
   cohort <- NULL
   n_vars <- qc_stats$variables %>%
@@ -101,7 +101,7 @@ summarise_variables <- function(qc_stats) {
 #' @return A data frame with the `measure` column values renamed:
 #'   "total_vars" is renamed to "Number of variables" and "max_obs" is renamed to "Maximum number of participants".
 #' @importFrom dplyr case_when
-#' @export
+#' @noRd
 .rename_vars <- function(transposed) {
   out <- transposed %>%
     dplyr::mutate(measure = dplyr::case_when(
