@@ -9,26 +9,27 @@ params:
 ---
 
 ```{r setup, message = F, warning = F, echo = F, include = F}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 options(datashield.progress = T)
 ```
 
-```{r test-param}
-print(params$qc_stats)
-```
-
 ### Technical: Is the cohort server currently up?
-###```{r dictionaries-available, echo = F}
-params$qc_stats$packages %>% 
-  kbl(col.names = c("", names(conns))) %>%
+```{r server}
+params$qc_stats$accessible %>% 
+  pivot_longer(
+    cols = c(success, message),
+    names_to = "type",
+    values_to = "value") %>%
+  pivot_wider(
+    names_from = cohort,
+    values_from = value) %>%
+  kbl(col.names = c("", params$qc_stats$accessible$cohort)) %>%
   kable_styling(bootstrap_options = c("striped", "hover")) %>%
   column_spec(1, "5cm")
-###```
-
-
+```
 
 ### Technical: Which DataSHIELD packages are available?
-```{r packages-available}
+```{r packages}
 params$qc_stats$packages$version_status %>%
   as_tibble(rownames = "Package") %>%
   kbl() %>%
@@ -36,9 +37,8 @@ params$qc_stats$packages$version_status %>%
 ```
 
 ### High-level: Which tables are available for which cohorts?
-```{r dictionaries-available, echo = F}
+```{r tables}
 dic_info <- format_dictionary_info(params$qc_stats$coh_dics, params$qc_stats$all_dics)
-
 cohort_names <- colnames(dic_info)[colnames(dic_info) != "dictionary"]
 
 dic_info %>% 
@@ -48,120 +48,46 @@ dic_info %>%
 ```
 
 ### High-level: How many variables and observations do each cohort have available?
-```{r variable-summary, echo = F}
-variable_summary <- summarise_variables(qc_stats)
+```{r variable-high-level}
+variable_summary <- sumarise_total_vars_and_obs(params$qc_stats$variables)
 
 variable_summary %>%
-  kbl(col.names = c("", cohort_names)) %>%
+  kbl() %>%
   kable_styling(bootstrap_options = c("striped", "hover")) %>%
   column_spec(1, "5cm")
 ```
 
-### Detailed: What are the core demographics of the cohort?
+### High-level: How many observations per variable?
+```{r observations-high-level}
+obs_per_var <- summarise_obs_per_variable(params$qc_stats$variables)
+groups <- .make_collapse_vector(obs_per_var)
 
-
-### Detailed: What are the class and values of all variables?
-
-
-```{r get-demographic-info, echo = F, message = FALSE, warnings = FALSE, include = F}
-label_ref <- tibble(
-  variable = c("agebirth_m_y", "ethn3_m", "sex", "min_age", "max_age", "edu_m_"),
-  var_label = c("Maternal age", "Maternal ethnicity", "Child sex",
-                "Youngest child age", "Oldest child age", "Maternal education")
-)
-
-cat_ref <- tibble(
-  variable = c(
-    rep("ethn3_m", 3), rep("sex", 2), rep("edu_m_", 3)),
-  category = c("1", "2", "3", "1", "2", "1", "2", "3"),
-  cat_label = c("White Western", "Mixed", "Other", "Male", "Female", "High", "Medium", "Low"))
-```
-
-### What are the core demographics of each cohort?
-```{r demographics, echo = F}
-demo_neat <- dh.createTableOne(
-  stats = demographics,
-  type = "cohort",
-  vars = c("agebirth_m_y", "ethn3_m", "sex", "min_age", "max_age", "edu_m_"),
-  inc_missing = F,
-  perc_denom = "total",
-  var_labs = label_ref, 
-  cat_labs = cat_ref, 
-  cont_format = "mean_sd") %>%
-  mutate(category = ifelse(category == "med_iqr", "", category))
-
-demo_neat %>%
-  kbl(col.names = c("", "", names(conns))) %>%
-  kable_styling(bootstrap_options = c("striped", "hover")) %>%
-  column_spec(1, "5cm")
-```
-
-## High-level summary: How many observations per variable?
-```{r}
-all_vars <- coh_dics_available %>%
-  pmap(function(cohort, long_name, ...) {
-    dh.getStats(
-      df = long_name,
-      conns = conns[cohort])
-  })
-
-valid_n <- all_vars %>%
-  set_names(coh_dics_available$long_name) %>%
-  imap(function(.x, .y){
-    categorical <- .x$categorical %>% mutate(dictionary = .y)
-    continuous <- .x$continuous %>% mutate(dictionary = .y)
-    return(list(categorical = categorical, continuous = continuous))
-  }) %>%
-  pmap(bind_rows) %>%
-  map(~dplyr::select(., cohort, dictionary, variable, observations = valid_n)) %>%
-  map(~dplyr::filter(., cohort != "combined")) %>%
-  bind_rows() %>%
-  dplyr::filter(!is.na(observations)) %>%
-  distinct() %>%
-  pivot_wider(
-    names_from = "cohort",
-    values_from = "observations")
-
-valid_n_formatted <- left_join(valid_n, vars_with_labels) %>%
-  arrange(dictionary)
-
-groups <- rle(valid_n_formatted$dictionary)$lengths
-
-names(groups) <- unique(valid_n_formatted$dictionary)
-
-valid_n_formatted %>%
-  dplyr::select(-dictionary, -dataset, -label, -var_label) %>%
+obs_per_var %>%
+  dplyr::select(-dictionary) %>%
   kbl() %>%
   kable_styling(bootstrap_options = c("striped", "hover")) %>%
   pack_rows(index = groups)
 ```
 
+### Deatiled: What are the core demographics of each cohort?
+```{r demographics-detailed}
+demographics <- summarise_demographics(params$qc_stats$variables, params$qc_stats$demographics)
+
+demographics %>%
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
 
 
-What else?
-- Within a domain, the number of variables for which there is some data
+### Detailed: What are the class and values of all variables?
+```{r variables-detailed}
+detailed <- summarise_values_and_class(params$qc_stats$variables)
+groups <- .make_collapse_vector(detailed)
 
-
-- Iterate through dictionary, characterise all variables. Summary of everything?
-- Are the types what we expect in the dictionary?
-- Where is there actual data?
-
-
-- Query whether values are very different between cohorts
-- Check with Martine re ATHLETE additional profile paper
-- Bridge to the barcelona team
-
-- Areas of information cohort
-- Variables tables, keywords
-- Keywords table
-
-
-Bioinformatics: application note
-
-
-Result - how we used it in practice
-Figure: flow diagram
-
-alternative: longer story
-
+detailed %>%
+  dplyr::select(-dictionary) %>%
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  pack_rows(index = groups)
+```
 

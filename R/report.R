@@ -7,14 +7,89 @@
 #' @importFrom dplyr case_when
 #' @return A data frame summarizing the total number of variables and the maximum sample size for each cohort.
 #' @export
-summarise_variables <- function(variables) {
+sumarise_total_vars_and_obs <- function(variables) {
   collapsed <- .collapse_vars(variables)
   n_vars <- .count_vars(collapsed)
   max_obs <- .get_max_obs(variables)
   combined <- left_join(n_vars, max_obs, by = "cohort")
-  transposed <- .flip_rows_columns(combined)
+  transposed <- .flip_rows_columns(combined, c("total_vars", "max_obs"))
   out <- .rename_vars(transposed)
   return(out)
+}
+
+summarise_obs_per_variable <- function(variables){
+  obs <- variables %>%
+    map_depth(2, ~dplyr::select(., variable, cohort, valid_n, any_of("category"))) %>%
+    map(bind_rows) %>%
+    bind_rows(.id = "dictionary") %>%
+    dplyr::filter(!is.na(category)) %>%
+    dplyr::select(-category) %>%
+    dplyr::filter(cohort != "combined") %>%
+    distinct() %>%
+    mutate(valid_n = as.character(valid_n)) %>%
+    pivot_wider(
+      names_from = cohort,
+      values_from = valid_n)
+  return(obs)
+}
+
+summarise_values_and_class <- function(variables){
+  values_class <- .loop_table_one(variables) %>%
+    .format_values_class()
+  return(values_class)
+}
+
+summarise_demographics <- function(variables, demographics){
+  var_labels <- .make_var_ref()
+  cat_labels <- .make_cat_ref()
+  non_rep_vars <- .filter_non_rep(variables)
+  vars_joined <- .join_demographics(non_rep_vars, demographics)
+  out <- .make_demographic_table(vars_joined, var_labels, cat_labels)
+  return(out)
+}
+
+.join_demographics <- function(non_rep_vars, demographics){
+  vars_joined <- list(non_rep_vars, demographics) %>%
+    pmap(bind_rows)
+  return(vars_joined)
+}
+
+
+.filter_non_rep <- function(variables){
+  non_rep_vars <- variables$core_non %>%
+    map(~dplyr::filter(., variable %in% c("agebirth_m_y", "ethn3_m", "sex")))
+  return(non_rep_vars)
+}
+
+.make_demographic_table <- function(vars_joined, var_labels, cat_labels){
+  out <- dh.createTableOne(
+    stats = vars_joined,
+    type = "cohort",
+    vars = c("agebirth_m_y", "ethn3_m", "sex", "min_age", "max_age", "edu_m_"),
+    inc_missing = F,
+    perc_denom = "total",
+    var_labs = var_labels,
+    cat_labs = cat_labels,
+    cont_format = "mean_sd")
+  return(out)
+}
+
+.make_var_ref <- function(){
+  label_ref <- tibble(
+    variable = c("agebirth_m_y", "ethn3_m", "sex", "min_age", "max_age", "edu_m_"),
+    var_label = c("Maternal age", "Maternal ethnicity", "Child sex",
+                  "Youngest child age", "Oldest child age", "Maternal education")
+  )
+  return(label_ref)
+}
+
+.make_cat_ref <- function(){
+  cat_ref <- tibble(
+    variable = c(
+      rep("ethn3_m", 3), rep("sex", 2), rep("edu_m_", 3)),
+    category = c("1", "2", "3", "1", "2", "1", "2", "3"),
+    cat_label = c("White Western", "Mixed", "Other", "Male", "Female", "High", "Medium", "Low"))
+  return(cat_ref)
 }
 
 .collapse_vars <- function(variables){
@@ -85,11 +160,11 @@ summarise_variables <- function(variables) {
 #'   (`total_vars` and `max_obs`) as rows and the cohorts as columns.
 #' @importFrom tidyr pivot_longer pivot_wider
 #' @noRd
-.flip_rows_columns <- function(var_summary) {
+.flip_rows_columns <- function(var_summary, non_cohort_vars) {
   total_vars <- max_obs <- cohort <- value <- NULL
   flipped <- var_summary %>%
     pivot_longer(
-      cols = c(total_vars, max_obs),
+      cols = all_of(non_cohort_vars),
       names_to = "measure",
       values_to = "value"
     ) %>%
@@ -119,5 +194,30 @@ summarise_variables <- function(variables) {
   return(out)
 }
 
+.format_values_class <- function(looped_vars){
+  formatted <- looped_vars %>%
+    bind_rows(.id = "dictionary") %>%
+    mutate(type = ifelse(category == "Mean \u00B1 SD", "Continuous", "Categorical")) %>%
+  dplyr::select(dictionary, variable, type, category, everything())
+  return(formatted)
+}
 
+.loop_table_one <- function(variables){
+  variables %>%
+    map(
+      ~dh.createTableOne(
+        stats = .x,
+        vars = c(.x$categorical$variable, .x$continuous$variable) %>% unique(),
+        type = "cohort",
+        cont_format = "mean_sd",
+        inc_missing = F,
+        perc_denom = "valid")
+    )
+}
+
+.make_collapse_vector <- function(data){
+  groups <- rle(data$dictionary)$lengths
+  names(groups) <- unique(data$dictionary)
+  return(groups)
+}
 

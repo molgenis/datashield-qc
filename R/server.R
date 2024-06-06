@@ -9,7 +9,10 @@
 .check_server_up <- function(login_data){
   response <- login_data$url %>% map(.get_handle_error)
   errors <- response %>% map(.extract_get_error)
-  formatted <- errors %>% map(.format_get_error) %>% bind_rows()
+  formatted <- errors %>%
+    map(.format_get_error) %>%
+    set_names(login_data$cohort) %>%
+    bind_rows(.id = "cohort")
   return(formatted)
 }
 

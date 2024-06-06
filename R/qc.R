@@ -19,28 +19,42 @@ run_qc <- function(login_data){
 
   cli_h1("Checking if servers are reachable")
   accessible <- .check_server_up(login_data)
+  cli_alert_success("Done")
 
   cli_h1("Logging in")
   login_return <- .login_qc(login_data)
+  cli_alert_success("Done")
 
   cli_h1("Fetching package information")
   packages <- datashield.pkg_status(login_return$conns)
+  cli_alert_success("Done")
 
   cli_h1("Fetching table information")
   all_possible_dictionaries <- list_all_dic_files()
   cohort_dics_available <- identify_cohort_dics(login_return$conns)
+  cli_alert_success("Done")
 
-  cli_h1("Assigning variables")
+  cli_h1("Assigning tables")
   assign_where_available(cohort_dics_available, login_return$conns)
+  cli_alert_success("Done")
 
   cli_h1("Fetching variable information")
   all_vars <- .get_stats_all_tables(cohort_dics_available, login_return$conns)
+  cli_alert_success("Done")
+
+  cli_h1("Fetching additional demographic information")
+  demographics <- get_demographics(cohort_dics_available, "core_non", "core_yearly", "edu_m_", login_return$conns)
 
   out <- list(
+    accessible = accessible,
+    login_errors = login_return$login_summary,
     packages = packages,
     coh_dics = cohort_dics_available,
     all_dics = all_possible_dictionaries,
-    variables = all_vars)
+    variables = all_vars,
+    demographics = demographics)
+
+  cli_alert_success("QC Complete")
 
   return(out)
 

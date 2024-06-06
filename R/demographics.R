@@ -5,9 +5,7 @@
 #' @param available_dics A data frame containing available dictionary information.
 #' @param core_df The core data frame to be used.
 #' @param yearly_df The yearly data frame containing repeated measures.
-#' @param core_vars A vector of core variables to be extracted.
 #' @param edu_var The educational variable to be used.
-#' @param repeated_dfs A vector of data frames with repeated measures.
 #' @param conns A datashield connections object
 #'
 #' @return A list containing combined demographic statistics.
@@ -15,41 +13,17 @@
 #' @importFrom dplyr %>%
 #' @importFrom purrr pmap
 #' @export
-.get_demographics <- function(available_dics, core_df, yearly_df, core_vars, edu_var,
-                              repeated_dfs, conns) {
-  non_rep_stats <- .get_stats_where_available(
-    available_dics = available_dics,
-    filter_var = core_df,
-    df = core_df,
-    vars = core_vars,
-    conns = conns
+get_demographics <- function(available_dics, core_df, yearly_df, edu_var, conns) {
+
+  suppressMessages(
+    .make_first_year_from_repeats(available_dics, yearly_df, edu_var = edu_var, conns = conns)
+    edu_stats <- .get_stats_where_available(available_dics, yearly_df, "df_year_1", edu_var, conns)
+    child_age_stats <- .get_child_age_range(available_dics, conns)
+    out <- list(
+      categorical = edu_stats$categorical,
+      continous = child_age_stats)
   )
-  .make_first_year_from_repeats(available_dics, yearly_df, edu_var = edu_var, conns = conns)
-
-  mat_ed_stats <- .get_stats_where_available(
-    available_dics = available_dics,
-    filter_var = yearly_df,
-    df = "df_year_1",
-    vars = "edu_m_",
-    conns = conns
-  )
-
-  child_age_stats <- .get_child_age_range(
-    available_dics = available_dics,
-    repeated_dfs = repeated_dfs,
-    conns = conns
-  )
-
-  non_rep_stats_combined <- non_rep_stats %>% pmap(bind_rows)
-  mat_ed_stats_combined <- mat_ed_stats %>% pmap(bind_rows)
-  child_age_stats_combined <- child_age_stats %>% pmap(bind_rows)
-  oldest_youngest_ages <- .get_oldest_youngest_ages(child_age_stats_combined)
-  all_stats <- list(non_rep_stats_combined, mat_ed_stats_combined) %>%
-    pmap(bind_rows)
-
-  all_stats$continuous <- bind_rows(all_stats$continuous, oldest_youngest_ages)
-
-  return(all_stats)
+  return(out)
 }
 
 #' Get Oldest and Youngest Ages
@@ -61,15 +35,16 @@
 #' @return A data frame with the oldest and youngest ages formatted.
 #' @importFrom dplyr if_else mutate n
 #' @noRd
-.get_oldest_youngest_ages <- function(age_stats_combined, conns) {
+.get_oldest_youngest_ages <- function(repeated_stats) {
   cohort <- NULL
-  formatted <- age_stats_combined$continuous %>%
+  formatted <- repeated_stats %>%
+    map(~.x$continuous) %>%
+    bind_rows() %>%
     dplyr::filter(cohort != "combined") %>%
     group_by(cohort) %>%
     arrange(mean) %>%
     slice(c(1, n())) %>%
     mutate(variable = if_else(mean == min(mean), "min_age", "max_age"))
-
   return(formatted)
 }
 
@@ -78,12 +53,18 @@
 #' This function retrieves the age range of children from the repeated measures data.
 #'
 #' @param available_dics A data frame containing available dictionary information.
-#' @param repeated_dfs A vector of data frames with repeated measures.
 #' @param conns A datashield connections object
 #' @return A list of age statistics for children.
 #' @noRd
-.get_child_age_range <- function(available_dics, repeated_dfs, conns) {
+.get_child_age_range <- function(available_dics, conns) {
   long_name <- NULL
+  repeated_dfs <- .get_repeated_df_names(available_dics)
+  repeated_stats <- .get_stats_repeated(available_dics, repeated_dfs, conns)
+  child_ages <- .get_oldest_youngest_ages(repeated_stats)
+  return(child_ages)
+}
+
+.get_stats_repeated <- function(avaiable_dics, repeated_dfs, conns){
   child_ages <- available_dics %>%
     dplyr::filter(long_name %in% repeated_dfs) %>%
     pmap(function(cohort, long_name, ...) {
@@ -93,10 +74,13 @@
         conns = conns[cohort]
       )
     })
-
-  return(child_ages)
 }
 
+.get_repeated_df_names <- function(available_dics){
+  repeated_dfs <- available_dics$long_name %>%
+    str_subset("weekly|monthly|yearly|trimester")
+  return(repeated_dfs)
+}
 #' Get Statistics Where Available
 #'
 #' This function retrieves statistics where available from the provided data sources.
@@ -121,7 +105,8 @@
         vars = vars,
         conns = conns[.x]
       )
-    )
+    ) %>%
+    pmap(bind_rows)
 }
 
 #' Make First Year from Repeats
