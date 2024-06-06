@@ -5,7 +5,7 @@
 #'
 #' @param login_data A data frame containing the login data with a column `url`.
 #' @return A tibble with columns `success` indicating if the server is up and `message` containing the error message if any.
-#' @export
+#' @noRd
 .check_server_up <- function(login_data){
   response <- login_data$url %>% map(.get_handle_error)
   errors <- response %>% map(.extract_get_error)

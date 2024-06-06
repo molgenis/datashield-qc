@@ -1,0 +1,100 @@
+---
+title: "DataSHIELD QC Report"
+output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+editor_options: 
+  chunk_output_type: console
+params:
+  qc_stats: NULL
+  technical: NULL
+  high: NULL
+  detailed: NULL
+---
+
+```{r setup, message = F, warning = F, echo = F, include = F}
+knitr::opts_chunk$set(echo = FALSE)
+options(datashield.progress = T)
+col_1_width = "6cm"
+```
+
+```{r server, eval = params$technical}
+server_table <- .make_server_table(params$qc_stats$accessible)
+server_table %>%
+  kbl(
+    col.names = .make_table_headers(server_table),
+    caption = "<span style='font-size:large'>Technical: Is the cohort server currently up</span>") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  column_spec(1, col_1_width)
+```
+
+```{r packages, eval = params$technical}
+package_table <- .make_package_table(params$qc_stats$packages$version_status)
+package_table %>%
+  kbl(
+    col.names = .make_table_headers(package_table),
+    caption = "<span style='font-size:large'>Technical: Which DataSHIELD packages are available?</span>", 
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  column_spec(1, col_1_width)
+```
+
+```{r tables, eval = params$high}
+dic_info <- format_dictionary_info(params$qc_stats$coh_dics, params$qc_stats$all_dics)
+dic_info %>% 
+  kbl(
+    col.names = .make_table_headers(dic_info),
+    caption = "<span style='font-size:large'>High-level: Which tables are available for which cohorts?</span>") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  column_spec(1, col_1_width)
+```
+
+```{r variable-high-level, eval = params$high}
+variable_summary <- summarise_total_vars_and_obs(params$qc_stats$variables)
+variable_summary %>%
+  kbl(
+    col.names = .make_table_headers(variable_summary),
+    caption = "<span style='font-size:large'>High-level: How many variables and observations do each cohort have available?</span>") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  column_spec(1, col_1_width)
+```
+
+```{r observations-high-level, eval = params$high}
+obs_per_var <- summarise_obs_per_variable(params$qc_stats$variables)
+groups <- .make_collapse_vector(obs_per_var)
+obs_min <- obs_per_var %>% dplyr::select(-dictionary) 
+obs_min %>%
+  kbl(
+    col.names = .make_table_headers(obs_min),
+    caption = "<span style='font-size:large'>High-level: How many observations per variable?</span>"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  pack_rows(index = groups) %>%
+  column_spec(1, col_1_width)
+```
+
+```{r demographics-detailed, eval = params$detailed}
+demographics <- summarise_demographics(params$qc_stats$variables, params$qc_stats$demographics)
+
+demographics %>%
+  kbl(
+    col.names = .make_table_headers(demographics),
+    caption = "<span style='font-size:large'>Detailed: What are the core demographics of each cohort?</span>"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  column_spec(1, col_1_width)
+```
+
+```{r variables-detailed, eval = params$detailed}
+detailed <- summarise_values_and_class(params$qc_stats$variables)
+groups <- .make_collapse_vector(detailed)
+detailed_min <- detailed %>% dplyr::select(-dictionary)
+detailed_min %>%
+  kbl(
+    col.names = .make_table_headers(detailed_min),
+    caption = "<span style='font-size:large'>Detailed: What are the class and values of all variables?</span>"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  pack_rows(index = groups) %>%
+  column_spec(1, col_1_width)
+```
+

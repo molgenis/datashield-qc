@@ -21,6 +21,7 @@
             conns = conns[cohort])
         )
       )
-    }) %>% set_names(cohort_dics_available$long_name)
+    }) %>%
+    set_names(cohort_dics_available$long_name)
   return(stats)
 }

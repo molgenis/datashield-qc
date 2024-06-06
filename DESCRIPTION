@@ -20,5 +20,7 @@ Imports:
   tibble,
   tidyr,
   httr2,
-  cli, 
-  MolgenisArmadillo
+  cli,
+  MolgenisArmadillo,
+  rmarkdown, 
+  tidyselect

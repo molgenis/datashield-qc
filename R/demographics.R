@@ -6,23 +6,32 @@
 #' @param core_df The core data frame to be used.
 #' @param yearly_df The yearly data frame containing repeated measures.
 #' @param edu_var The educational variable to be used.
-#' @param conns A datashield connections object
+#' @param conns A datashield connections object.
 #'
 #' @return A list containing combined demographic statistics.
 #' @importFrom dsHelper dh.getStats dh.makeStrata
 #' @importFrom dplyr %>%
 #' @importFrom purrr pmap
-#' @export
+#' @noRd
 get_demographics <- function(available_dics, core_df, yearly_df, edu_var, conns) {
 
   suppressMessages(
-    .make_first_year_from_repeats(available_dics, yearly_df, edu_var = edu_var, conns = conns)
-    edu_stats <- .get_stats_where_available(available_dics, yearly_df, "df_year_1", edu_var, conns)
-    child_age_stats <- .get_child_age_range(available_dics, conns)
-    out <- list(
-      categorical = edu_stats$categorical,
-      continous = child_age_stats)
+    .make_first_year_from_repeats(available_dics, yearly_df, edu_var, conns)
   )
+
+  edu_stats <- suppressMessages(
+    .get_stats_where_available(available_dics, yearly_df, "df_year_1", edu_var, conns)
+  )
+
+  child_age_stats <- suppressMessages(
+    .get_child_age_range(available_dics, conns)
+  )
+
+  out <- list(
+    categorical = edu_stats$categorical,
+    continuous = child_age_stats
+  )
+
   return(out)
 }
 
@@ -30,10 +39,10 @@ get_demographics <- function(available_dics, core_df, yearly_df, edu_var, conns)
 #'
 #' This function retrieves the oldest and youngest ages from the combined age statistics.
 #'
-#' @param age_stats_combined A data frame containing combined age statistics.
-#' @param conns A datashield connections object
+#' @param repeated_stats A data frame containing combined age statistics.
 #' @return A data frame with the oldest and youngest ages formatted.
-#' @importFrom dplyr if_else mutate n
+#' @importFrom dplyr if_else mutate n filter group_by arrange slice
+#' @importFrom purrr map
 #' @noRd
 .get_oldest_youngest_ages <- function(repeated_stats) {
   cohort <- NULL
@@ -53,19 +62,33 @@ get_demographics <- function(available_dics, core_df, yearly_df, edu_var, conns)
 #' This function retrieves the age range of children from the repeated measures data.
 #'
 #' @param available_dics A data frame containing available dictionary information.
-#' @param conns A datashield connections object
+#' @param conns A datashield connections object.
 #' @return A list of age statistics for children.
+#' @importFrom purrr map
+#' @importFrom dplyr bind_rows filter
 #' @noRd
 .get_child_age_range <- function(available_dics, conns) {
-  long_name <- NULL
   repeated_dfs <- .get_repeated_df_names(available_dics)
   repeated_stats <- .get_stats_repeated(available_dics, repeated_dfs, conns)
   child_ages <- .get_oldest_youngest_ages(repeated_stats)
   return(child_ages)
 }
 
-.get_stats_repeated <- function(avaiable_dics, repeated_dfs, conns){
-  child_ages <- available_dics %>%
+#' Get Statistics for Repeated Measures
+#'
+#' This function retrieves statistics for repeated measures data frames.
+#'
+#' @param available_dics A data frame containing available dictionary information.
+#' @param repeated_dfs A vector of repeated data frame names.
+#' @param conns A datashield connections object.
+#' @return A list of statistics for the repeated measures.
+#' @importFrom purrr pmap
+#' @importFrom dsHelper dh.getStats
+#' @importFrom dplyr filter
+#' @noRd
+.get_stats_repeated <- function(available_dics, repeated_dfs, conns) {
+  long_name <- cohort <- NULL
+  repeated_stats <- available_dics %>%
     dplyr::filter(long_name %in% repeated_dfs) %>%
     pmap(function(cohort, long_name, ...) {
       dh.getStats(
@@ -74,13 +97,23 @@ get_demographics <- function(available_dics, core_df, yearly_df, edu_var, conns)
         conns = conns[cohort]
       )
     })
+  return(repeated_stats)
 }
 
-.get_repeated_df_names <- function(available_dics){
+#' Get Repeated Data Frame Names
+#'
+#' This function retrieves the names of data frames that contain repeated measures.
+#'
+#' @param available_dics A data frame containing available dictionary information.
+#' @return A vector of repeated data frame names.
+#' @importFrom stringr str_subset
+#' @noRd
+.get_repeated_df_names <- function(available_dics) {
   repeated_dfs <- available_dics$long_name %>%
     str_subset("weekly|monthly|yearly|trimester")
   return(repeated_dfs)
 }
+
 #' Get Statistics Where Available
 #'
 #' This function retrieves statistics where available from the provided data sources.
@@ -89,14 +122,14 @@ get_demographics <- function(available_dics, core_df, yearly_df, edu_var, conns)
 #' @param filter_var The variable used to filter the dictionary.
 #' @param df The data frame from which to extract statistics.
 #' @param vars A vector of variables to extract statistics for.
-#' @param conns A datashield connections object
-#'
+#' @param conns A datashield connections object.
 #' @return A list of statistics for the specified variables.
 #' @importFrom dplyr pull
+#' @importFrom purrr map pmap
 #' @noRd
 .get_stats_where_available <- function(available_dics, filter_var, df, vars, conns) {
   long_name <- cohort <- NULL
-  available_dics %>%
+  available_stats <- available_dics %>%
     dplyr::filter(long_name == filter_var) %>%
     pull(cohort) %>%
     map(
@@ -105,8 +138,10 @@ get_demographics <- function(available_dics, core_df, yearly_df, edu_var, conns)
         vars = vars,
         conns = conns[.x]
       )
-    ) %>%
+    )
+  combined_stats <- available_stats %>%
     pmap(bind_rows)
+  return(combined_stats)
 }
 
 #' Make First Year from Repeats
@@ -116,14 +151,12 @@ get_demographics <- function(available_dics, core_df, yearly_df, edu_var, conns)
 #' @param available_dics A data frame containing available dictionary information.
 #' @param year_rep_df The yearly data frame containing repeated measures.
 #' @param edu_var The educational variable to be used.
-#' @param conns A datashield connections object
+#' @param conns A datashield connections object.
 #' @importFrom dplyr pull
 #' @importFrom dsBaseClient ds.dataFrameSubset
-#'
-#' @return None. The function modifies the data in place.
+#' @importFrom purrr map
 #' @noRd
-.make_first_year_from_repeats <- function(available_dics, year_rep_df, edu_var,
-                                          conns) {
+.make_first_year_from_repeats <- function(available_dics, year_rep_df, edu_var, conns) {
   long_name <- cohort <- NULL
   available_dics %>%
     dplyr::filter(long_name == year_rep_df) %>%

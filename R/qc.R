@@ -1,19 +1,22 @@
 #' Perform Quality Control for DataShield Connections
 #'
-#' This function performs a series of quality control checks on DataShield connections. It fetches package information,
-#' retrieves dictionary information, assigns variables, fetches variable statistics, and obtains key demographics.
+#' This function performs a series of quality control checks on DataShield connections. It checks server accessibility, logs into the servers, retrieves package and dictionary information, assigns variables, fetches variable statistics, and obtains key demographics.
 #'
-#' @param login_data Tibble of server info.
-#' @importFrom cli cli_h1 cli_alert_info
+#' @param login_data A tibble containing server information.
+#' @importFrom cli cli_h1 cli_alert_success
 #' @importFrom DSI datashield.pkg_status
 #' @importFrom rlang set_names
 #' @return A list containing:
+#' \item{accessible}{Boolean indicating if servers are reachable.}
+#' \item{login_errors}{Summary of login errors, if any.}
 #' \item{packages}{Information about the DataShield packages available.}
-#' \item{variables}{Statistics for the all variables.}
+#' \item{coh_dics}{Dictionary information available for each cohort.}
+#' \item{all_dics}{All possible dictionary information.}
+#' \item{variables}{Statistics for all variables.}
 #' \item{demographics}{Specific demographic information.}
 #' @export
-run_qc <- function(login_data){
-  options(datashield.progress = F)
+run_qc <- function(login_data) {
+  options(datashield.progress = FALSE)
 
   cli_h1("Performing DataSHIELD QC")
 
@@ -39,6 +42,7 @@ run_qc <- function(login_data){
   cli_alert_success("Done")
 
   cli_h1("Fetching variable information")
+  options(cli.spinner = "line")
   all_vars <- .get_stats_all_tables(cohort_dics_available, login_return$conns)
   cli_alert_success("Done")
 
@@ -52,10 +56,10 @@ run_qc <- function(login_data){
     coh_dics = cohort_dics_available,
     all_dics = all_possible_dictionaries,
     variables = all_vars,
-    demographics = demographics)
+    demographics = demographics
+  )
 
   cli_alert_success("QC Complete")
 
   return(out)
-
 }

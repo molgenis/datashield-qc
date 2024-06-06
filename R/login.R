@@ -8,7 +8,7 @@
 #'   It should include columns like `cohort`, `url`, `server`, `username`, `password`, `value`.
 #' @importFrom cli cli_abort
 #' @return A list containing the successful connections and a summary of the login process.
-#' @export
+#' @noRd
 .login_qc <- function(credentials){
   credentials_split <- .split_credentials_by_server(credentials)
   armadillo_credentials <- .get_and_add_tokens(credentials_split)

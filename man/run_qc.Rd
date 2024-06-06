@@ -7,15 +7,18 @@
 run_qc(login_data)
 }
 \arguments{
-\item{login_data}{Tibble of server info.}
+\item{login_data}{A tibble containing server information.}
 }
 \value{
 A list containing:
+\item{accessible}{Boolean indicating if servers are reachable.}
+\item{login_errors}{Summary of login errors, if any.}
 \item{packages}{Information about the DataShield packages available.}
-\item{variables}{Statistics for the all variables.}
+\item{coh_dics}{Dictionary information available for each cohort.}
+\item{all_dics}{All possible dictionary information.}
+\item{variables}{Statistics for all variables.}
 \item{demographics}{Specific demographic information.}
 }
 \description{
-This function performs a series of quality control checks on DataShield connections. It fetches package information,
-retrieves dictionary information, assigns variables, fetches variable statistics, and obtains key demographics.
+This function performs a series of quality control checks on DataShield connections. It checks server accessibility, logs into the servers, retrieves package and dictionary information, assigns variables, fetches variable statistics, and obtains key demographics.
 }

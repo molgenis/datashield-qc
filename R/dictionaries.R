@@ -10,7 +10,7 @@
 #' @importFrom stringr str_remove_all str_split str_detect
 #' @importFrom DSI datashield.tables
 #' @return A final table containing cleaned and organized cohort dictionary information.
-#' @export
+#' @noRd
 identify_cohort_dics <- function(conns) {
   dictionaries <- list_all_dic_files()
   cohort_dics <- .get_cohort_dics(conns)
