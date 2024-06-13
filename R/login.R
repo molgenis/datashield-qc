@@ -11,8 +11,12 @@
 #' @noRd
 .login_qc <- function(credentials){
   credentials_split <- .split_credentials_by_server(credentials)
-  armadillo_credentials <- .get_and_add_tokens(credentials_split)
-  login_data <- .build_login_objects(armadillo_credentials, credentials_split$opal)
+
+  if(nrow(credentials_split$armadillo) > 0){
+    credentials_split$armadillo <- .get_and_add_tokens(credentials_split)
+  }
+
+  login_data <- .build_login_objects(credentials_split)
   login_result <- .handle_login(login_data)
   login_success <- .get_login_success(login_result)
   login_failure <- .get_login_failure(login_result)
@@ -39,10 +43,9 @@
 #' @noRd
 .split_credentials_by_server <- function(credentials){
   server <- NULL
-  split <- credentials %>%
-    group_by(server) %>%
-    group_split %>%
-    set_names(credentials$server %>% unique)
+  split <- list(
+    opal = credentials %>% dplyr::filter(server == "opal"),
+    armadillo = credentials %>% dplyr::filter(server == "armadillo"))
   return(split)
 }
 
@@ -117,10 +120,16 @@
 #' @importFrom DSI newDSLoginBuilder
 #' @return A list of login objects split by server.
 #' @noRd
-.build_login_objects <- function(armadillo_credentials, opal_credentials){
+.build_login_objects <- function(credentials_split){
   builder <- newDSLoginBuilder()
-  .make_login_armadillo(builder, armadillo_credentials)
-  .make_login_opal(builder, opal_credentials)
+  if(nrow(credentials_split$armadillo > 0)){
+  .make_login_armadillo(builder, credentials_split$armadillo)
+  }
+
+  if(nrow(credentials_split$opal > 0)){
+  .make_login_opal(builder, credentials_split$opal)
+  }
+
   login_split <- .split_login_object(builder)
   return(login_split)
 }
@@ -275,7 +284,13 @@
 #' @noRd
 .build_login_summary <- function(credentials, login_failure){
   value <- NULL
-  login_summary <- left_join(credentials, login_failure, by = "cohort") %>%
-    mutate(success = ifelse(is.na(value), TRUE, FALSE))
+
+  if(nrow(login_failure) > 0){
+    login_summary <- left_join(credentials, login_failure, by = "cohort") %>%
+      mutate(success = ifelse(is.na(value), TRUE, FALSE))
+  } else {
+    login_summary <- credentials %>% mutate(success = TRUE)
+
+  }
   return(login_summary)
 }
