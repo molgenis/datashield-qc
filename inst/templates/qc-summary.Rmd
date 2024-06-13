@@ -1,14 +1,16 @@
 ---
-title: "DataSHIELD QC Report"
-output: html_document
-date: "`r format(Sys.time(), '%d %B, %Y')`"
-editor_options: 
-  chunk_output_type: console
 params:
   qc_stats: NULL
   technical: NULL
   high: NULL
   detailed: NULL
+  set_title: NULL
+title: "`r params$set_title`"
+output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+editor_options: 
+  chunk_output_type: console
+
 ---
 
 ```{r setup, message = F, warning = F, echo = F, include = F}
@@ -59,7 +61,8 @@ variable_summary %>%
 ```
 
 ```{r observations-high-level, eval = params$high}
-obs_per_var <- summarise_obs_per_variable(params$qc_stats$variables)
+obs_per_var <- summarise_obs_per_variable(params$qc_stats$variables) %>%
+  arrange(dictionary)
 groups <- .make_collapse_vector(obs_per_var)
 obs_min <- obs_per_var %>% dplyr::select(-dictionary) 
 obs_min %>%
@@ -85,7 +88,8 @@ demographics %>%
 ```
 
 ```{r variables-detailed, eval = params$detailed}
-detailed <- summarise_values_and_class(params$qc_stats$variables)
+detailed <- summarise_values_and_class(params$qc_stats$variables)  %>%
+  arrange(dictionary)
 groups <- .make_collapse_vector(detailed)
 detailed_min <- detailed %>% dplyr::select(-dictionary)
 detailed_min %>%
