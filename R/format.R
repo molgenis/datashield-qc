@@ -44,7 +44,7 @@ summarise_total_vars_and_obs <- function(variables) {
   total_vars <- NULL
   collapsed <- .collapse_vars(variables)
   n_vars <- .count_vars(collapsed)
-  max_obs <- .get_max_obs(variables)
+  max_obs <- .get_max_obs(variables[names(variables) %in% "core_non"])
   combined <- left_join(n_vars, max_obs, by = "cohort") %>%
     mutate(across(c(max_obs, total_vars), ~as.character(.x)))
   transposed <- .flip_rows_columns(combined, c("total_vars", "max_obs"))
@@ -244,7 +244,8 @@ summarise_demographics <- function(variables, demographics) {
 #' @noRd
 .get_max_obs <- function(variables) {
   cohort <- valid_n <- max_obs <- desc <- NULL
-  max_sample <- variables$core_non %>%
+  max_sample <- variables %>%
+    .collapse_vars() %>%
     map(~ dplyr::select(., cohort, valid_n)) %>%
     bind_rows() %>%
     dplyr::filter(cohort != "combined") %>%
