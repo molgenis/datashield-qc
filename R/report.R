@@ -8,7 +8,7 @@
 #' @importFrom rmarkdown render
 #' @return The path to the generated report.
 #' @export
-make_qc_report <- function(qc_stats, sections, output_dir = NULL) {
+make_qc_report <- function(qc_stats, sections, title, output_file = NULL, output_dir = NULL) {
 
   if (is.null(output_dir)) {
     output_dir <- getwd()
@@ -24,6 +24,8 @@ make_qc_report <- function(qc_stats, sections, output_dir = NULL) {
       qc_stats = qc_stats,
       technical = technical,
       high = high,
-      detailed = detailed),
+      detailed = detailed,
+      set_title = title),
+    output_file = output_file,
     output_dir = output_dir)
 }
